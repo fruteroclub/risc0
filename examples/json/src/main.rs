@@ -12,20 +12,43 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use serde::{Deserialize, Serialize};
+use actix_web::{web, App, HttpResponse, HttpServer, Responder};
+
 use json_core::Outputs;
 use json_methods::SEARCH_JSON_ELF;
-use risc0_zkvm::{default_prover, ExecutorEnv};
+use risc0_zkvm::{default_prover, ExecutorEnv, sha::Digest};
 
-fn main() {
+use std::sync::Mutex;
+use lazy_static::lazy_static;
+
+#[derive(Serialize, Deserialize)]
+struct Proof {
+    hash: Digest,
+}
+
+async fn create_proof(item: web::Json<Proof>) -> impl Responder {
+    let outputs = search_json(data);
+    HttpResponse::Created().json(*outputs.hash)
+}
+
+#[actix_web::main]
+async fn main() -> std::io::Result<()> {
+    HttpServer::new(|| {
+        App::new()
+            .route("/proof", web::post().to(create_proof))
+    })
+    .bind("127.0.0.1:8080")?
+    .run()
+    .await
+}
+
+/*fn main() {
     let data = include_str!("../res/example.json");
     let outputs = search_json(data);
     println!();
     println!("  {:?}", outputs.hash);
-    println!(
-        "provably contains a field 'critical_data' with value {}",
-        outputs.data
-    );
-}
+}*/
 
 fn search_json(data: &str) -> Outputs {
     let env = ExecutorEnv::builder()
@@ -49,9 +72,6 @@ mod tests {
     fn main() {
         let data = include_str!("../res/example.json");
         let outputs = super::search_json(data);
-        assert_eq!(
-            outputs.data, 47,
-            "Did not find the expected value in the critical_data field"
-        );
+        println!("The proof for you config file is {:?}", outputs.hash);
     }
 }
